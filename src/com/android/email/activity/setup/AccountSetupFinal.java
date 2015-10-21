@@ -347,12 +347,15 @@ public class AccountSetupFinal extends AccountSetupActivity
             updateContentFragment(false /* addToBackstack */);
             getFragmentManager().executePendingTransactions();
 
-            if (!DEBUG_ALLOW_NON_TEST_HARNESS_CREATION &&
-                    !ActivityManager.isRunningInTestHarness()) {
-                LogUtils.e(LogUtils.TAG,
-                        "ERROR: Force account create only allowed while in test harness");
-                finish();
-                return;
+            //Enabling force create account for OMA CP
+            if(!(getResources().getBoolean(R.bool.enable_force_configure_account))){
+                if (!DEBUG_ALLOW_NON_TEST_HARNESS_CREATION &&
+                        !ActivityManager.isRunningInTestHarness()) {
+                    LogUtils.e(LogUtils.TAG,
+                            "ERROR: Force account create only allowed while in test harness");
+                    finish();
+                    return;
+                }
             }
 
             mForceCreate = true;
@@ -766,7 +769,22 @@ public class AccountSetupFinal extends AccountSetupActivity
      */
     private boolean onBasicsComplete() {
         final AccountSetupBasicsFragment f = (AccountSetupBasicsFragment) getContentFragment();
-        final String email = f.getEmail();
+        String email = f.getEmail();
+        String[] emailParts = new String[2];
+        String domain = null;
+
+        /**
+         * Default domain implementation
+         * Verify default domain feaure is enable/disabled and username provided contains domian
+         * if enabled, append the username string with default domain provided
+         * if disabled, set it to base behavior
+         */
+        if (getResources().getBoolean(R.bool.enable_auto_fill_domain)) {
+            if (!email.contains("@")) {
+                domain = getString(R.string.default_domain);
+                email = email + "@" + getString(R.string.default_domain);
+            }
+        }
 
         // Reset the protocol choice in case the user has back-navigated here
         mSetupData.setIncomingProtocol(this, null);
@@ -777,8 +795,9 @@ public class AccountSetupFinal extends AccountSetupActivity
         }
         mSetupData.setEmail(email);
 
-        final String[] emailParts = email.split("@");
-        final String domain = emailParts[1].trim();
+        emailParts = email.split("@");
+        domain = emailParts[1].trim();
+
         mProvider = AccountSettingsUtils.findProviderForDomain(this, domain);
         if (mProvider != null) {
             mIsPreConfiguredProvider = true;
@@ -1143,6 +1162,8 @@ public class AccountSetupFinal extends AccountSetupActivity
         }
         account.setFlags(newFlags);
         account.setSyncInterval(fragment.getCheckFrequencyValue());
+        account.setSyncSizeEnabled(fragment.getSyncSizeEnabledValue());
+        account.setSyncSize(fragment.getSyncSizeValue());
         final Integer syncWindowValue = fragment.getAccountSyncWindowValue();
         if (syncWindowValue != null) {
             account.setSyncLookback(syncWindowValue);
