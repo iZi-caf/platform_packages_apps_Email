@@ -70,9 +70,6 @@ import android.util.Log;
 public class Pop3Service extends Service {
     private static final String TAG = "Pop3Service";
     private static final int DEFAULT_SYNC_COUNT = 100;
-    private static final String ACTION_CHECK_MAIL =
-            "org.codeaurora.email.intent.action.MAIL_SERVICE_WAKEUP";
-    private static final String EXTRA_ACCOUNT = "org.codeaurora.email.intent.extra.ACCOUNT";
 
     private static final String ACTION_CHECK_MAIL =
          "com.android.email.intent.action.MAIL_SERVICE_WAKEUP";
