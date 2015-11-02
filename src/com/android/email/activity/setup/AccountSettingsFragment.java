@@ -17,10 +17,14 @@
 package com.android.email.activity.setup;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.Dialog;
+import android.app.DialogFragment;
 import android.app.LoaderManager;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.Loader;
 import android.content.res.Resources;
@@ -94,6 +98,8 @@ public class AccountSettingsFragment extends MailAccountPrefsFragment
     private static final String PREFERENCE_SYNC_EMAIL = "account_sync_email";
     private static final String PREFERENCE_SYNC_CONTACTS = "account_sync_contacts";
     private static final String PREFERENCE_SYNC_CALENDAR = "account_sync_calendar";
+    private static final String PREFERENCE_SYNC_SIZE_ENABLE = "account_sync_size_enable";
+    private static final String PREFERENCE_SYNC_SIZE = "account_sync_size";
     private static final String PREFERENCE_BACKGROUND_ATTACHMENTS =
             "account_background_attachments";
     private static final String PREFERENCE_CATEGORY_DATA_USAGE = "data_usage";
@@ -112,6 +118,9 @@ public class AccountSettingsFragment extends MailAccountPrefsFragment
     private static final String PREFERENCE_SYSTEM_FOLDERS_TRASH = "system_folders_trash";
     private static final String PREFERENCE_SYSTEM_FOLDERS_SENT = "system_folders_sent";
 
+    private static final String PREFERENCE_REMOVE_EMAIL_ACCOUNT = "remove_email_account";
+    private static final String PREFERENCE_CATEGORY_REMOVE_ACCOUNT = "remove_account";
+
     private static final String SAVESTATE_SYNC_INTERVALS = "savestate_sync_intervals";
     private static final String SAVESTATE_SYNC_INTERVAL_STRINGS = "savestate_sync_interval_strings";
 
@@ -124,6 +133,8 @@ public class AccountSettingsFragment extends MailAccountPrefsFragment
     private ListPreference mCheckFrequency;
     private ListPreference mSyncWindow;
     private Preference mSyncSettings;
+    private CheckBoxPreference mSyncSizeEnable;
+    private ListPreference mSyncSize;
     private CheckBoxPreference mInboxVibrate;
     private Preference mInboxRingtone;
 
@@ -380,6 +391,10 @@ public class AccountSettingsFragment extends MailAccountPrefsFragment
             ContentResolver.setSyncAutomatically(androidAcct, CalendarContract.AUTHORITY,
                     (Boolean) newValue);
             loadSettings();
+        } else if (key.equals(PREFERENCE_SYNC_SIZE_ENABLE)) {
+            final boolean enabled = (Boolean) newValue;
+            mSyncSize.setEnabled(enabled);
+            cv.put(AccountColumns.SET_SYNC_SIZE_ENABLED, enabled ? 1 : 0);
         } else if (key.equals(PREFERENCE_BACKGROUND_ATTACHMENTS)) {
             int newFlags = mAccount.getFlags() & ~(Account.FLAGS_BACKGROUND_ATTACHMENTS);
 
@@ -783,6 +798,36 @@ public class AccountSettingsFragment extends MailAccountPrefsFragment
             }
         }
 
+        mSyncSizeEnable = (CheckBoxPreference) findPreference(PREFERENCE_SYNC_SIZE_ENABLE);
+        mSyncSize = (ListPreference) findPreference(PREFERENCE_SYNC_SIZE);
+        if (mSyncSizeEnable != null && mSyncSize != null) {
+            mSyncSizeEnable.setOnPreferenceChangeListener(this);
+            mSyncSize.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+                public boolean onPreferenceChange(Preference preference, Object newValue) {
+                    final String summary = newValue.toString();
+                    int index = mSyncSize.findIndexOfValue(summary);
+                    mSyncSize.setSummary(mSyncSize.getEntries()[index]);
+                    mSyncSize.setValue(summary);
+
+                    // Commit the value
+                    ContentValues cv = new ContentValues();
+                    cv.put(AccountColumns.SYNC_SIZE, Integer.parseInt(summary));
+                    new UpdateTask().run(mContext.getContentResolver(), mAccount.getUri(), cv,
+                            null, null);
+                    EmailProvider.setServicesEnabledAsync(mContext);
+                    return false;
+                }
+            });
+
+            // Set sync size configurations
+            mSyncSizeEnable.setEnabled(true);
+            mSyncSizeEnable.setChecked(mAccount.isSetSyncSizeEnabled());
+
+            mSyncSize.setEnabled(mAccount.isSetSyncSizeEnabled());
+            mSyncSize.setValue(String.valueOf(mAccount.getSyncSize()));
+            mSyncSize.setSummary(mSyncSize.getEntry());
+        }
+
         final PreferenceCategory notificationsCategory =
                 (PreferenceCategory) findPreference(PREFERENCE_CATEGORY_NOTIFICATIONS);
 
@@ -941,6 +986,36 @@ public class AccountSettingsFragment extends MailAccountPrefsFragment
                 dataUsageCategory.removePreference(syncEmail);
             }
         }
+
+        // Delete email account feature
+        final PreferenceCategory removeAccountCategory =
+                (PreferenceCategory) findPreference(PREFERENCE_CATEGORY_REMOVE_ACCOUNT);
+        final Preference prefRemoveAccount = findPreference(PREFERENCE_REMOVE_EMAIL_ACCOUNT);
+
+        if (prefRemoveAccount != null) {
+            if (getResources().getBoolean(R.bool.enable_delete_account_setting)) {
+                prefRemoveAccount.setOnPreferenceClickListener(
+                        new Preference.OnPreferenceClickListener() {
+                            @Override
+                            public boolean onPreferenceClick(
+                                    Preference preference) {
+                                ConfirmDeleteAccountDialogFragment dialogFragment =
+                                        ConfirmDeleteAccountDialogFragment
+                                                .newInstance();
+                                dialogFragment.show(getFragmentManager(),
+                                        ConfirmDeleteAccountDialogFragment.TAG);
+                                return true;
+                            }
+                        });
+            } else {
+                if (removeAccountCategory != null) {
+                    removeAccountCategory.removePreference(prefRemoveAccount);
+                    getPreferenceScreen().removePreference(
+                            removeAccountCategory);
+                }
+
+            }
+        }
     }
 
     /**
@@ -986,5 +1061,41 @@ public class AccountSettingsFragment extends MailAccountPrefsFragment
         final Intent intent =
                 AccountServerSettingsActivity.getIntentForOutgoing(getActivity(), account);
         getActivity().startActivity(intent);
+    }
+
+    /**
+     * Dialog fragment to confirm delete account action
+     */
+    public static class ConfirmDeleteAccountDialogFragment extends
+            DialogFragment {
+        final static String TAG = "ConfirmDeleteAccountDialogFragment";
+
+        // Force usage of newInstance()
+        public ConfirmDeleteAccountDialogFragment() {
+        }
+
+        public static ConfirmDeleteAccountDialogFragment newInstance() {
+            return new ConfirmDeleteAccountDialogFragment();
+        }
+
+        @Override
+        public Dialog onCreateDialog(Bundle savedInstanceState) {
+
+            return new AlertDialog.Builder(getActivity())
+                    .setTitle(R.string.remove_email_account)
+                    .setMessage(R.string.remove_email_account_message)
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton(R.string.remove_email_account_continue,
+                            new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog,
+                                        int which) {
+                                    Intent intent = new Intent();
+                                    intent.setAction("android.settings.SETTINGS");
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                    getActivity().startActivity(intent);
+                                }
+                            }).create();
+        }
     }
 }
