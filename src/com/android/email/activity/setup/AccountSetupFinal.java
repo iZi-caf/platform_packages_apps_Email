@@ -949,6 +949,10 @@ public class AccountSetupFinal extends AccountSetupActivity
      */
     private void populateSetupData(String senderName, String senderEmail) {
         final Account account = mSetupData.getAccount();
+        String signature = getResources().getString(R.string.default_email_signature);
+        if (!TextUtils.isEmpty(signature)) {
+            account.setSignature(signature);
+        }
         account.setSenderName(senderName);
         account.setEmailAddress(senderEmail);
         account.setDisplayName(senderEmail);
