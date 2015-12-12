@@ -30,6 +30,7 @@
         android:id="@+id/account_username"
         android:layout_height="wrap_content"
         android:layout_width="match_parent"
+        android:textAlignment="viewStart"
         android:hint="@string/account_setup_incoming_username_label"
         android:inputType="textEmailAddress" />
 
@@ -79,6 +80,7 @@
         android:id="@+id/account_server"
         android:layout_height="wrap_content"
         android:layout_width="match_parent"
+        android:textAlignment="viewStart"
         android:hint="@string/account_setup_incoming_server_label"
         android:inputType="textUri" />
     <TextView

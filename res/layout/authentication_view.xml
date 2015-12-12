@@ -66,6 +66,7 @@
             android:layout_weight="1"
             android:hint="@string/account_setup_incoming_password_label"
             android:layout_gravity="center_vertical"
+            android:textAlignment="viewStart"
             android:inputType="textPassword"
             android:imeOptions="actionNext" />
 

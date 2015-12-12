@@ -2338,7 +2338,8 @@ public class EmailProvider extends ContentProvider
     private static void writeBodyFiles(final Context c, final long messageId,
             final ContentValues cv) throws IllegalStateException {
         if (cv.containsKey(BodyColumns.HTML_CONTENT)) {
-            final String htmlContent = cv.getAsString(BodyColumns.HTML_CONTENT);
+            String htmlContent = cv.getAsString(BodyColumns.HTML_CONTENT);
+            htmlContent = Utility.uncompress(htmlContent);
             try {
                 writeBodyFile(c, messageId, "html", htmlContent);
             } catch (final IOException e) {
@@ -2347,7 +2348,8 @@ public class EmailProvider extends ContentProvider
             }
         }
         if (cv.containsKey(BodyColumns.TEXT_CONTENT)) {
-            final String textContent = cv.getAsString(BodyColumns.TEXT_CONTENT);
+            String textContent = cv.getAsString(BodyColumns.TEXT_CONTENT);
+            textContent = Utility.uncompress(textContent);
             try {
                 writeBodyFile(c, messageId, "txt", textContent);
             } catch (final IOException e) {
@@ -3500,7 +3502,8 @@ public class EmailProvider extends ContentProvider
 
         // If the configuration states that feedback is supported, add that capability
         final Resources res = context.getResources();
-        if (res.getBoolean(R.bool.feedback_supported)) {
+        Uri feedbackUri = Utils.getValidUri(res.getString(R.string.email_feedback_uri));
+        if (res.getBoolean(R.bool.feedback_supported) && !Uri.EMPTY.equals(feedbackUri)) {
             capabilities |= AccountCapabilities.SEND_FEEDBACK;
         }
 
